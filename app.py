@@ -58,7 +58,7 @@ st.write(
     " المحاسبية وفق نظام SCF."
 )
 
-# --- 2. القائمة الجانبية: إدارة الشركات فقط (بدون خانة API) ---
+# --- 2. القائمة الجانبية: إدارة الشركات فقط ---
 st.sidebar.title("⚙️ إدارة الشركات")
 
 with st.sidebar.expander("➕ تسجيل شركة جديدة"):
@@ -128,8 +128,7 @@ else:
         st.warning("يرجى كتابة نص العملية أولاً.")
       else:
         with st.spinner(
-            "🧠 جاري الاتصال بمحرك الذكاء الاصطناعي وتحليل القيود"
-            " المحاسبية..."
+            "🧠 جاري الاتصال بمحرك Gemini 3.8 وتحليل القيود المحاسبية..."
         ):
           try:
             client = genai.Client(api_key=GEMINI_API_KEY.strip())
@@ -148,8 +147,9 @@ else:
             اكتب الإجابة بتنسيق واضح ومنظم جداً.
             """
 
+            # استخدام النموذج الأحدث المطلوب رسمياً
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.8-flash",
                 contents=prompt,
             )
 
@@ -212,4 +212,3 @@ else:
     for l in logs:
       with st.expander(f"العملية: {l[0]} ({l[2]})"):
         st.markdown(l[1])
-      
