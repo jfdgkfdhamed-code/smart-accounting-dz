@@ -52,7 +52,7 @@ st.write(
 )
 
 # --- 2. القائمة الجانبية ---
-st.sidebar.title("🏢 إداراة العملاء والشركات")
+st.sidebar.title("🏢 إدارة العملاء والشركات")
 with st.sidebar.expander("➕ تسجيل شركة جديدة"):
   comp_name = st.text_input("اسم المؤسسة")
   comp_rc = st.text_input("رقم السجل التجاري")
@@ -69,14 +69,14 @@ with st.sidebar.expander("➕ تسجيل شركة جديدة"):
         conn.commit()
         st.sidebar.success("تم فتح ملف الشركة بنجاح!")
         st.rerun()
-      except:
+      except Exception:
         st.sidebar.error("الشركة مسجلة مسبقاً!")
 
 cursor.execute("SELECT id, name, capital FROM companies")
 comps = cursor.fetchall()
 
 if not comps:
-  st.warning("👈 يرجى تسجيل وإضافة شركة للبدء.")
+  st.warning("👈 يرجى تسجيل وإضافة شركة للبدء من القائمة الجانبية.")
 else:
   c_map = {c[1]: (c[0], c[2]) for c in comps}
   sel_comp = st.sidebar.selectbox(
@@ -121,59 +121,66 @@ else:
       ai_submit = st.form_submit_button("🚀 تحليل العملية وتوليد القيد المحاسبي")
 
       if ai_submit and ai_input_text:
-        st.info("🔄 جاري تحليل المعطيات وحساب الآثار المحاسبية والجبائية...")
-
-        # محاكاة لمحرك الذكاء الاصطناعي المحاسبي المتقدم
+        # تخزين النتائج مؤقتاً في session_state لتفادي أخطاء التخطيط
         lower_text = ai_input_text.lower()
         if "اهتلاك" in lower_text or "إهتلاك" in lower_text:
-          op_type = "تسجيل قسط الاهتلاك (Amortissement)"
-          debit = "حساب 68 (مخصصات الاهتلاك والمؤونات)"
-          credit = "حساب 28 (اهتلاك تثبيتات)"
-          # محاكاة استخراج الأرقام وتحليلها
-          ai_analysis = (
+          st.session_state["op_type"] = (
+              "تسجيل قسط الاهتلاك (Amortissement)"
+          )
+          st.session_state["debit"] = "حساب 68 (مخصصات الاهتلاك والمؤونات)"
+          st.session_state["credit"] = "حساب 28 (اهتلاك تثبيتات)"
+          st.session_state["ai_analysis"] = (
               "✅ **تحليل الذكاء الاصطناعي:** تم رصد عملية اهتلاك تثبيتات."
-              " النظام قام بتطبيق طريقة الاهتلاك الخطي وتوليد القيد المحاسبي"
-              " القانوني المطابق للمعايير المحاسبية المالية (SCF)."
+              " تطبيق طريقة الاهتلاك الخطي وتوليد القيد المحاسبي القانوني."
           )
         elif "سفتجة" in lower_text or "كمبيالة" in lower_text:
-          op_type = "خصم ورقة تجارية (Effet de commerce)"
-          debit = "حساب 51 (البنك / الصندوق) + حساب 62 (مصاريف البنك والخصم)"
-          credit = "حساب 41 (الزبناء - أوراق تجارية للدفع)"
-          ai_analysis = (
-              "✅ **تحليل الذكاء الاصطناعي:** تم رصد عملية سفتجة مع خصم بنكي."
-              " النظام قام بفصل الصافي المقبوض عن مصاريف الأغراض البنكية"
-              " لتفادي خطأ تسوية الصندوق."
+          st.session_state["op_type"] = (
+              "خصم ورقة تجارية (Effet de commerce)"
+          )
+          st.session_state["debit"] = (
+              "حساب 51 (البنك / الصندوق) + حساب 62 (مصاريف الخصم)"
+          )
+          st.session_state["credit"] = "حساب 41 (الزبناء - أوراق تجارية للدفع)"
+          st.session_state["ai_analysis"] = (
+              "✅ **تحليل الذكاء الاصطناعي:** تم رصد سفتجة مع خصم بنكي وفصل"
+              " مصاريف البنك."
           )
         else:
-          op_type = "عملية مالية عامة ومشتريات"
-          debit = "حساب الأعباء أو المخزون المعني"
-          credit = "حساب الموردين أو الخزينة"
-          ai_analysis = (
+          st.session_state["op_type"] = "عملية مالية عامة ومشتريات"
+          st.session_state["debit"] = "حساب الأعباء أو المخزون المعني"
+          st.session_state["credit"] = "حساب الموردين أو الخزينة"
+          st.session_state["ai_analysis"] = (
               "✅ **تحليل الذكاء الاصطناعي:** تم تصنيف العملية ضمن القيود"
               " العادية مع التحقق من توازن المدين والدائن."
           )
+        st.session_state["ai_notes"] = ai_input_text
+        st.success("تم تحليل العملية بنجاح! أنظر النتيجة في الأسفل.")
 
-        st.success(ai_analysis)
-        st.markdown(f"**نوع العملية:** {op_type}")
-        st.markdown(f"**المدين (Débit):** {debit}")
-        st.markdown(f"**الدائن (Crédit):** {credit}")
+    # عرض التحليل وزر الاعتماد خارج النماذج البرمجية لضمان عدم حدوث الخطأ
+    if "ai_analysis" in st.session_state:
+      st.divider()
+      st.markdown(st.session_state["ai_analysis"])
+      st.markdown(f"**نوع العملية:** {st.session_state['op_type']}")
+      st.markdown(f"**المدين (Débit):** {st.session_state['debit']}")
+      st.markdown(f"**الدائن (Crédit):** {st.session_state['credit']}")
 
-        # زر لتأكيد حفظ القيد المستخرج بالذكاء الاصطناعي في قاعدة البيانات
-        if st.button("💾 اعتماد وحفظ هذا القيد في دفاتر الشركة"):
-          cursor.execute(
-              "INSERT INTO entries (company_id, operation_type, debit_account,"
-              " credit_account, amount, ai_notes) VALUES (?, ?, ?, ?, ?, ?)",
-              (
-                  cid,
-                  op_type,
-                  debit,
-                  credit,
-                  100000.0,
-                  ai_input_text,
-              ),  # مبلغ افتراضي للتوضيح
-          )
-          conn.commit()
-          st.success("تم تثبيت القيد المحاسبي في السجل بنجاح!")
+      if st.button("💾 اعتماد وحفظ هذا القيد في دفاتر الشركة رسمياً"):
+        cursor.execute(
+            "INSERT INTO entries (company_id, operation_type, debit_account,"
+            " credit_account, amount, ai_notes) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                cid,
+                st.session_state["op_type"],
+                st.session_state["debit"],
+                st.session_state["credit"],
+                100000.0,
+                st.session_state["ai_notes"],
+            ),
+        )
+        conn.commit()
+        st.success("تم تثبيت القيد المحاسبي في السجل بنجاح!")
+        del st.session_state["ai_analysis"]
+        st.rerun()
 
   # ==========================================
   # التبويب الثاني: التقارير والتحليل المالي
@@ -197,7 +204,7 @@ else:
       st.dataframe(tcr_df, use_container_width=True)
     else:
       st.info(
-          "لم يتم تسجيل أي عمليات بعد. استخدم المحلل الذكي في التبوب الأول لإدخال"
+          "لم يتم تسجيل أي عمليات بعد. استخدم المحلل الذكي في التبويب الأول لإدخال"
           " العمليات."
       )
 
