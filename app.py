@@ -1,21 +1,22 @@
+import os
 import sqlite3
+from google import genai
 import pandas as pd
 import streamlit as st
 
 # إعدادات الصفحة الاحترافية
 st.set_page_config(
-    page_title="المحاسب الذكي بالذكاء الاصطناعي - AI Accounting ERP",
+    page_title="المحاسب الذكي - Real AI Accounting ERP",
     page_icon="🤖",
     layout="wide",
 )
 
 
-# --- 1. إعداد قاعدة البيانات المتقدمة ---
+# --- 1. إعداد قاعدة البيانات ---
 def init_db():
-  conn = sqlite3.connect("ai_accounting.db", check_same_thread=False)
+  conn = sqlite3.connect("real_ai_accounting.db", check_same_thread=False)
   cursor = conn.cursor()
 
-  # جدول الشركات
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS companies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +26,6 @@ def init_db():
         )
     """)
 
-  # جدول القيود المحاسبية المعقدة
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +34,8 @@ def init_db():
             debit_account TEXT,
             credit_account TEXT,
             amount REAL,
-            ai_notes TEXT,
+            ai_analysis TEXT,
+            raw_text TEXT,
             date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES companies(id)
         )
@@ -45,14 +46,23 @@ def init_db():
 
 conn, cursor = init_db()
 
-st.title("🤖 النظام المحاسبي الذكي المدعوم بالذكاء الاصطناعي (AI ERP)")
+st.title("🧠 النظام المحاسبي المدعوم بالذكاء الاصطناعي الحقيقي (Gemini AI)")
 st.write(
-    "نظام متطور يدمج المنطق المحاسبي المعقد (اهتلاك، سفتجات، ضرائب) مع معالجة"
-    " الذكاء الاصطناعي."
+    "نظام سحابي يقبل النصوص الحرة بأي لغة أو صياغة ويقوم بتحليلها وإيجاد القيود"
+    " المحاسبية وفق نظام SCF."
 )
 
-# --- 2. القائمة الجانبية ---
-st.sidebar.title("🏢 إدارة العملاء والشركات")
+# --- 2. القائمة الجانبية: إضافة شركة وإدخال مفتاح API ---
+st.sidebar.title("⚙️ الإعدادات والشركات")
+
+# مفتاح Gemini API
+gemini_api_key = st.sidebar.text_input(
+    "أدخل مفتاح Gemini API الخاص بك:",
+    type="password",
+    help="يمكنك الحصول عليه مجاناً من Google AI Studio",
+)
+
+st.sidebar.divider()
 with st.sidebar.expander("➕ تسجيل شركة جديدة"):
   comp_name = st.text_input("اسم المؤسسة")
   comp_rc = st.text_input("رقم السجل التجاري")
@@ -84,155 +94,123 @@ else:
   )
   cid, c_capital = c_map[sel_comp]
 
-  st.sidebar.divider()
   st.sidebar.info(f"الشركة النشطة: **{sel_comp}**")
 
-  # التبويبات الكبرى للنظام الذكي
-  tab1, tab2, tab3 = st.tabs(
-      [
-          "🤖 المحلل الذكي للعمليات المعقدة (AI Engine)",
-          "📊 ميزانية الشركات وجدول النتائج (TCR)",
-          "📜 دفتر القيود المركبة والتدقيق",
-      ]
-  )
+  tab1, tab2, tab3 = st.tabs([
+      "🤖 المحلل المحاسبي الذكي (Gemini)",
+      "📊 ميزانية الشركة وجدول النتائج",
+      "📜 دفتر القيود المعتمدة",
+  ])
 
   # ==========================================
-  # التبويب الأول: الذكاء الاصطناعي لمعالجة العمليات الصعبة
+  # التبويب الأول: التحليل بالذكاء الاصطناعي الحقيقي
   # ==========================================
   with tab1:
     st.subheader(
-        "🧠 معالجة العمليات المحاسبية المعقدة بالذكاء الاصطناعي (اهتلاك، سفتجات،"
-        " خصومات)"
-    )
-    st.write(
-        "أدخل وصف العملية باللغة العادية (مثلاً: شراء معدات بـ 500 ألف دج تهتلك"
-        " على 3 سنوات، أو خصم سفتجة بقيمة 20 ألف دج)، وسيقوم المحرك الذكي بتحليلها"
-        " واستخراج القيد المحاسبي تلقائياً!"
+        "🧠 تحليل النصوص الحرة والعمليات المعقدة (اهتلاكات، سفتجة، خصم)"
     )
 
-    with st.form("ai_engine_form"):
-      ai_input_text = st.text_area(
-          "اكتب العملية المحاسبية أو المالية هنا:",
+    with st.form("gemini_form"):
+      user_query = st.text_area(
+          "اكتب العملية المحاسبية بأي طريقة (عربى، دارجة، فرنسية، مصطلحات معقدة):",
           placeholder=(
-              "مثال: تم شراء شاحنة بـ 1,200,000 دج، وتخضع للاهتلاك الخطي على 5"
-              " سنوات."
+              "مثال: تم شراء سيارة نفعية بـ 150 مليون سنتيم، ورايحين نحسبو"
+              " الاهتلاك تاعها على 5 سنين بالخط المستقيم."
           ),
       )
-      ai_submit = st.form_submit_button("🚀 تحليل العملية وتوليد القيد المحاسبي")
+      submit_ai = st.form_submit_button("🚀 تحليل العملية عبر الذكاء الاصطناعي")
 
-      if ai_submit and ai_input_text:
-        # تخزين النتائج مؤقتاً في session_state لتفادي أخطاء التخطيط
-        lower_text = ai_input_text.lower()
-        if "اهتلاك" in lower_text or "إهتلاك" in lower_text:
-          st.session_state["op_type"] = (
-              "تسجيل قسط الاهتلاك (Amortissement)"
-          )
-          st.session_state["debit"] = "حساب 68 (مخصصات الاهتلاك والمؤونات)"
-          st.session_state["credit"] = "حساب 28 (اهتلاك تثبيتات)"
-          st.session_state["ai_analysis"] = (
-              "✅ **تحليل الذكاء الاصطناعي:** تم رصد عملية اهتلاك تثبيتات."
-              " تطبيق طريقة الاهتلاك الخطي وتوليد القيد المحاسبي القانوني."
-          )
-        elif "سفتجة" in lower_text or "كمبيالة" in lower_text:
-          st.session_state["op_type"] = (
-              "خصم ورقة تجارية (Effet de commerce)"
-          )
-          st.session_state["debit"] = (
-              "حساب 51 (البنك / الصندوق) + حساب 62 (مصاريف الخصم)"
-          )
-          st.session_state["credit"] = "حساب 41 (الزبناء - أوراق تجارية للدفع)"
-          st.session_state["ai_analysis"] = (
-              "✅ **تحليل الذكاء الاصطناعي:** تم رصد سفتجة مع خصم بنكي وفصل"
-              " مصاريف البنك."
-          )
-        else:
-          st.session_state["op_type"] = "عملية مالية عامة ومشتريات"
-          st.session_state["debit"] = "حساب الأعباء أو المخزون المعني"
-          st.session_state["credit"] = "حساب الموردين أو الخزينة"
-          st.session_state["ai_analysis"] = (
-              "✅ **تحليل الذكاء الاصطناعي:** تم تصنيف العملية ضمن القيود"
-              " العادية مع التحقق من توازن المدين والدائن."
-          )
-        st.session_state["ai_notes"] = ai_input_text
-        st.success("تم تحليل العملية بنجاح! أنظر النتيجة في الأسفل.")
+    if submit_ai:
+      if not gemini_api_key:
+        st.error(
+            "🚨 يرجى إدخال مفتاح Gemini API في القائمة الجانبية لتفعيل الذكاء"
+            " الاصطناعي الحقيقي!"
+        )
+      elif not user_query.strip():
+        st.warning("يرجى كتابة نص العملية أولاً.")
+      else:
+        with st.spinner(
+            "🧠 جاري إرسال النص إلى نموذج Gemini ومطابقته مع المعايير"
+            " المحاسبية..."
+        ):
+          try:
+            client = genai.Client(api_key=gemini_api_key)
 
-    # عرض التحليل وزر الاعتماد خارج النماذج البرمجية لضمان عدم حدوث الخطأ
-    if "ai_analysis" in st.session_state:
+            prompt = f"""
+            أنت خبير محاسبي مالي محترف متخصص في النظام المحاسبي المالي الجزائر (SCF) والقوانين الجبائية.
+            قم بتحليل العملية التالية التي كتبها المحاسب:
+            "{user_query}"
+
+            المطلوب:
+            1. حدد نوع العملية المحاسبية بدقة (اهتلاك، سفتجة، خصم، شراء، مبيعات...).
+            2. حدد حسابات المدين (Débit) وحسابات الدائن (Crédit) وأرقام الحسابات إن أمكن.
+            3. احسب المبلغ الصافي أو الأقساط إن وجدت.
+            4. قدم تحليلاً محاسبياً وجبائياً قصيراً ومباشراً.
+
+            اكتب الإجابة بتنسيق واضح ومنظم جداً.
+            """
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+
+            st.session_state["ai_response_text"] = response.text
+            st.session_state["raw_user_query"] = user_query
+            st.success("تم التحليل بنجاح بواسطة الذكاء الاصطناعي!")
+
+          except Exception as e:
+            st.error(f"حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {e}")
+
+    # عرض نتائج التحليل الحقيقي لـ Gemini
+    if "ai_response_text" in st.session_state:
       st.divider()
-      st.markdown(st.session_state["ai_analysis"])
-      st.markdown(f"**نوع العملية:** {st.session_state['op_type']}")
-      st.markdown(f"**المدين (Débit):** {st.session_state['debit']}")
-      st.markdown(f"**الدائن (Crédit):** {st.session_state['credit']}")
+      st.markdown("### 📋 نتيجة تحليل الذكاء الاصطناعي الحقيقي:")
+      st.markdown(st.session_state["ai_response_text"])
 
-      if st.button("💾 اعتماد وحفظ هذا القيد في دفاتر الشركة رسمياً"):
+      if st.button("💾 اعتماد وحفظ هذا القيد والتحليل في سجلات الشركة"):
         cursor.execute(
             "INSERT INTO entries (company_id, operation_type, debit_account,"
-            " credit_account, amount, ai_notes) VALUES (?, ?, ?, ?, ?, ?)",
+            " credit_account, amount, ai_analysis, raw_text) VALUES (?, ?,"
+            " ?, ?, ?, ?, ?)",
             (
                 cid,
-                st.session_state["op_type"],
-                st.session_state["debit"],
-                st.session_state["credit"],
-                100000.0,
-                st.session_state["ai_notes"],
+                "تحليل AI معقد",
+                "محدد في التقرير",
+                "محدد في التقرير",
+                0.0,
+                st.session_state["ai_response_text"],
+                st.session_state["raw_user_query"],
             ),
         )
         conn.commit()
-        st.success("تم تثبيت القيد المحاسبي في السجل بنجاح!")
-        del st.session_state["ai_analysis"]
+        st.success("تم تثبيت التقرير والقيد المحاسبي بنجاح!")
+        del st.session_state["ai_response_text"]
         st.rerun()
 
   # ==========================================
-  # التبويب الثاني: التقارير والتحليل المالي
+  # التبويب الثاني والثالث: عرض البيانات والدفاتر
   # ==========================================
   with tab2:
-    st.subheader("📊 لوحة المؤشرات المالية وجدول حساب النتائج (TCR)")
+    st.subheader("📊 القيود والتقارير المعتمدة للشركة")
     cursor.execute(
-        "SELECT operation_type, amount FROM entries WHERE company_id = ?",
-        (cid,),
+        "SELECT raw_text, date FROM entries WHERE company_id = ?", (cid,)
     )
-    recs = cursor.fetchall()
-
-    total_ops = len(recs)
-    st.metric("إجمالي القيود المعالجة ذكياً", total_ops)
-
-    if recs:
-      st.markdown("### جدول النتائج الملخص المستخرج من النظام الذكي")
-      tcr_df = pd.DataFrame(
-          recs, columns=["العملية المحاسبية", "المبلغ المقدر (دج)"]
-      )
-      st.dataframe(tcr_df, use_container_width=True)
-    else:
-      st.info(
-          "لم يتم تسجيل أي عمليات بعد. استخدم المحلل الذكي في التبويب الأول لإدخال"
-          " العمليات."
-      )
-
-  # ==========================================
-  # التبويب الثالث: سجل القيود والتدقيق
-  # ==========================================
-  with tab3:
-    st.subheader("📜 سجل التدقيق والقيود المحاسبية المؤكدة")
-    cursor.execute(
-        "SELECT operation_type, debit_account, credit_account, ai_notes, date"
-        " FROM entries WHERE company_id = ?",
-        (cid,),
-    )
-    audit_log = cursor.fetchall()
-
-    if audit_log:
+    entries_list = cursor.fetchall()
+    st.metric("عدد العمليات المحللة ذكياً", len(entries_list))
+    if entries_list:
       st.dataframe(
-          pd.DataFrame(
-              audit_log,
-              columns=[
-                  "نوع العملية",
-                  "المدين",
-                  "الدائن",
-                  "الوصف الأصلي",
-                  "التاريخ",
-              ],
-          ),
+          pd.DataFrame(entries_list, columns=["العملية الأصلية", "التاريخ"]),
           use_container_width=True,
       )
-    else:
-      st.info("سجل القيود فارغ حالياً.")
+
+  with tab3:
+    st.subheader("📜 تفاصيل التحليلات المحفوظة")
+    cursor.execute(
+        "SELECT raw_text, ai_analysis, date FROM entries WHERE company_id = ?",
+        (cid,),
+    )
+    logs = cursor.fetchall()
+    for l in logs:
+      with st.expander(f"العملية: {l[0]} ({l[2]})"):
+        st.markdown(l[1])
