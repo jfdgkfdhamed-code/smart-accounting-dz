@@ -130,7 +130,7 @@ else:
         st.warning("يرجى كتابة نص العملية أولاً.")
       else:
         with st.spinner(
-            "🧠 جاري الاتصال بمحرك Gemini 3.8 وتحليل القيود المحاسبية..."
+            "🧠 جاري الاتصال بمحرك Gemini وتحليل القيود المحاسبية..."
         ):
           try:
             client = genai.Client(api_key=gemini_api_key.strip())
@@ -149,9 +149,9 @@ else:
             اكتب الإجابة بتنسيق واضح ومنظم جداً.
             """
 
-            # استخدام النموذج الأحدث المطلوب من جوجل
+            # استخدام النموذج الأكثر استقراراً لتفادي الضغط
             response = client.models.generate_content(
-                model="gemini-3.8-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
             )
 
@@ -161,8 +161,8 @@ else:
 
           except Exception as e:
             st.error(
-                "حدث خطأ في الاتصال. تأكد أن المفتاح صحيح.\nالتفاصيل التقنية:"
-                f" {e}"
+                "حدث ضغط مؤقت في السيرفر أو خطأ في الاتصال. حاول مرة أخرى بعد"
+                f" قليل.\nالتفاصيل: {e}"
             )
 
     # عرض نتائج التحليل
