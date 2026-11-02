@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from google import genai
+import google.generativeai as genai
 import pandas as pd
 import streamlit as st
 
@@ -60,7 +60,7 @@ gemini_api_key = st.sidebar.text_input(
     "أدخل مفتاح Gemini API الخاص بك:",
     type="password",
     value="",
-    help="الصق مفتاحك الذي يبدأ بـ AIzaSy هنا",
+    help="الصق مفتاحك هنا",
 )
 
 st.sidebar.divider()
@@ -133,8 +133,9 @@ else:
             "🧠 جاري الاتصال بمحرك Gemini وتحليل القيود المحاسبية..."
         ):
           try:
-            # تهيئة عميل الذكاء الاصطناعي
-            client = genai.Client(api_key=gemini_api_key.strip())
+            # ضبط المفتاح بالطريقة الكلاسيكية المستقرة
+            genai.configure(api_key=gemini_api_key.strip())
+            model = genai.GenerativeModel("gemini-1.5-flash")
 
             prompt = f"""
             أنت خبير محاسبي مالي محترف متخصص في النظام المحاسبي المالي الجزائر (SCF) والقوانين الجبائية.
@@ -150,31 +151,16 @@ else:
             اكتب الإجابة بتنسيق واضح ومنظم جداً.
             """
 
-            # استخدام النموذج الأحدث المستقر والموصى به
-            response = client.models.generate_content(
-                model="gemini-2.5-flash", contents=prompt
-            )
+            response = model.generate_content(prompt)
 
             st.session_state["ai_response_text"] = response.text
             st.session_state["raw_user_query"] = user_query
             st.success("تم التحليل بنجاح بواسطة الذكاء الاصطناعي!")
 
           except Exception as e:
-            error_msg = str(e)
-            if "API_KEY_INVALID" in error_msg or "not valid" in error_msg:
-              st.error(
-                  "❌ خطأ: مفتاح Gemini API غير صحيح. تأكد من نسخه كاملاً وبدون"
-                  " فراغات."
-              )
-            elif "404" in error_msg or "NOT_FOUND" in error_msg:
-              st.error(
-                  "❌ خطأ في الاتصال بالنموذج. تأكد من تحديث المكتبات في"
-                  " requirements.txt"
-              )
-            else:
-              st.error(
-                  f"❌ حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {error_msg}"
-              )
+            st.error(
+                f"❌ حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {str(e)}"
+            )
 
     # عرض نتائج التحليل
     if "ai_response_text" in st.session_state:
