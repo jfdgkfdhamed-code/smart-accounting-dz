@@ -1,6 +1,6 @@
 import os
 import sqlite3
-import google.generativeai as genai
+from google import genai
 import pandas as pd
 import streamlit as st
 
@@ -46,24 +46,21 @@ def init_db():
 
 conn, cursor = init_db()
 
+# --- جلب مفتاح الـ API سرياً من السيرفر المركزي ---
+try:
+  GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+except Exception:
+  GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
 st.title("🧠 النظام المحاسبي المدعوم بالذكاء الاصطناعي (Gemini AI)")
 st.write(
     "نظام سحابي يقبل النصوص الحرة بأي صياغة ويقوم بتحليلها وإيجاد القيود"
     " المحاسبية وفق نظام SCF."
 )
 
-# --- 2. القائمة الجانبية: الإعدادات والشركات ---
-st.sidebar.title("⚙️ الإعدادات والشركات")
+# --- 2. القائمة الجانبية: إدارة الشركات فقط (بدون خانة API) ---
+st.sidebar.title("⚙️ إدارة الشركات")
 
-# خانة إدخال مفتاح الـ API
-gemini_api_key = st.sidebar.text_input(
-    "أدخل مفتاح Gemini API الخاص بك:",
-    type="password",
-    value="",
-    help="الصق مفتاحك هنا",
-)
-
-st.sidebar.divider()
 with st.sidebar.expander("➕ تسجيل شركة جديدة"):
   comp_name = st.text_input("اسم المؤسسة")
   comp_rc = st.text_input("رقم السجل التجاري")
@@ -122,20 +119,20 @@ else:
       submit_ai = st.form_submit_button("🚀 تحليل العملية عبر الذكاء الاصطناعي")
 
     if submit_ai:
-      if not gemini_api_key.strip():
+      if not GEMINI_API_KEY:
         st.error(
-            "🚨 يرجى لصق مفتاح Gemini API في خانة الشريط الجانبي أولاً!"
+            "🚨 النظام غير مهيأ بمفتاح السيرفر المركزي. يرجى ضبط"
+            " GEMINI_API_KEY في إعدادات Streamlit Secrets."
         )
       elif not user_query.strip():
         st.warning("يرجى كتابة نص العملية أولاً.")
       else:
         with st.spinner(
-            "🧠 جاري الاتصال بمحرك Gemini وتحليل القيود المحاسبية..."
+            "🧠 جاري الاتصال بمحرك الذكاء الاصطناعي وتحليل القيود"
+            " المحاسبية..."
         ):
           try:
-            # ضبط المفتاح بالطريقة الكلاسيكية المستقرة
-            genai.configure(api_key=gemini_api_key.strip())
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            client = genai.Client(api_key=GEMINI_API_KEY.strip())
 
             prompt = f"""
             أنت خبير محاسبي مالي محترف متخصص في النظام المحاسبي المالي الجزائر (SCF) والقوانين الجبائية.
@@ -151,7 +148,10 @@ else:
             اكتب الإجابة بتنسيق واضح ومنظم جداً.
             """
 
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
 
             st.session_state["ai_response_text"] = response.text
             st.session_state["raw_user_query"] = user_query
@@ -159,7 +159,8 @@ else:
 
           except Exception as e:
             st.error(
-                f"❌ حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {str(e)}"
+                "حدث خطأ في السيرفر أثناء معالجة العملية.\nالتفاصيل التقنية:"
+                f" {e}"
             )
 
     # عرض نتائج التحليل
@@ -211,3 +212,4 @@ else:
     for l in logs:
       with st.expander(f"العملية: {l[0]} ({l[2]})"):
         st.markdown(l[1])
+      
