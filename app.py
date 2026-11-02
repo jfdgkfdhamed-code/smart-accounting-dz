@@ -60,7 +60,7 @@ gemini_api_key = st.sidebar.text_input(
     "أدخل مفتاح Gemini API الخاص بك:",
     type="password",
     value="",
-    help="الصق مفتاحك هنا",
+    help="الصق مفتاحك الذي يبدأ بـ AIzaSy هنا",
 )
 
 st.sidebar.divider()
@@ -133,6 +133,7 @@ else:
             "🧠 جاري الاتصال بمحرك Gemini وتحليل القيود المحاسبية..."
         ):
           try:
+            # تهيئة عميل الذكاء الاصطناعي
             client = genai.Client(api_key=gemini_api_key.strip())
 
             prompt = f"""
@@ -149,10 +150,9 @@ else:
             اكتب الإجابة بتنسيق واضح ومنظم جداً.
             """
 
-            # استخدام النموذج الأكثر استقراراً لتفادي الضغط
+            # استخدام النموذج الأحدث المستقر والموصى به
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
+                model="gemini-2.5-flash", contents=prompt
             )
 
             st.session_state["ai_response_text"] = response.text
@@ -160,10 +160,21 @@ else:
             st.success("تم التحليل بنجاح بواسطة الذكاء الاصطناعي!")
 
           except Exception as e:
-            st.error(
-                "حدث ضغط مؤقت في السيرفر أو خطأ في الاتصال. حاول مرة أخرى بعد"
-                f" قليل.\nالتفاصيل: {e}"
-            )
+            error_msg = str(e)
+            if "API_KEY_INVALID" in error_msg or "not valid" in error_msg:
+              st.error(
+                  "❌ خطأ: مفتاح Gemini API غير صحيح. تأكد من نسخه كاملاً وبدون"
+                  " فراغات."
+              )
+            elif "404" in error_msg or "NOT_FOUND" in error_msg:
+              st.error(
+                  "❌ خطأ في الاتصال بالنموذج. تأكد من تحديث المكتبات في"
+                  " requirements.txt"
+              )
+            else:
+              st.error(
+                  f"❌ حدث خطأ أثناء الاتصال بالذكاء الاصطناعي: {error_msg}"
+              )
 
     # عرض نتائج التحليل
     if "ai_response_text" in st.session_state:
